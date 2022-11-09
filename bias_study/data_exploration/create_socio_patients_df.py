@@ -4,6 +4,7 @@ import os
 import pandas as pd
 
 COMMON_PATH = "/cluster/work/grlab/clinical/mimic/MIMIC-III/cdb_1.4/source_data"
+OUTPUT_PATH = "/custer/work/grlab/projects/projects2022-icu-biases/preprocessed_data/MIMIC"
 
 PUBLIC_INSURANCE = ["Medicare", "Medicaid", "Government"]
 UNSPECIFIED_ETHN = [
@@ -187,4 +188,5 @@ def main():
     patients = create_patient_language(patients, admissions)
     patients = create_patient_los(patients, last_admission, admissions, stays)
     subject_ids_adult = filter_adult_patients(last_admission)
-    return patients[subject_ids_adult]
+    patients_adult = patients[subject_ids_adult]
+    patients_adult.to_csv(os.path.join(OUTPUT_PATH, 'socioinfo_patients.csv'))
