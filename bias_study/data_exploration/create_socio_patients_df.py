@@ -4,7 +4,7 @@ import os
 import pandas as pd
 
 COMMON_PATH = "/cluster/work/grlab/clinical/mimic/MIMIC-III/cdb_1.4/source_data"
-OUTPUT_PATH = "/custer/work/grlab/projects/projects2022-icu-biases/preprocessed_data/MIMIC"
+OUTPUT_PATH = "/cluster/work/grlab/projects/projects2022-icu-biases/preprocessed_data/MIMIC"
 
 PUBLIC_INSURANCE = ["Medicare", "Medicaid", "Government"]
 UNSPECIFIED_ETHN = [
@@ -12,8 +12,6 @@ UNSPECIFIED_ETHN = [
     "PATIENT DECLINED TO ANSWER",
     "UNABLE TO OBTAIN",
 ]
-ETHN = ["WHITE", "LATINO", "BLACK", "ASIAN", "MIDDLE EASTERN", "NATIVE AMERICAN"]
-OTHER_ETHN = ["OTHER", "MULTI RACE ETHNICITY"]
 
 
 def map_ethnicity(ethnicity):
@@ -32,7 +30,7 @@ def map_ethnicity(ethnicity):
         or ethnicity == "AMERICAN INDIAN/ALASKA NATIVE FEDERALLY RECOGNIZED TRIBE"
     ):
         return "NATIVE AMERICAN"
-    if ethnicity in unspecified_ethn:
+    if ethnicity in UNSPECIFIED_ETHN:
         return "UNK"
     else:
         return "OTHER"
@@ -55,21 +53,23 @@ def read_specific_col_table(table_name, cols=None):
     return pd.read_csv(os.path.join(COMMON_PATH, table_name), usecols=cols)
 
 
-def create_age_admission(df_admissions, df_patients):
-    df_admissions = pd.merge(df_admissions, df_patients["DOB"], on="SUBJECT_ID")
-    df_admissions["ADMITDATE"] = df_admissions["ADMITTIME"].apply(
+def create_patient_age(df_patients, df_last_admission):
+    df_last_admission = pd.merge(df_last_admission, df_patients["DOB"], on="SUBJECT_ID")
+    df_last_admission["ADMITDATE"] = df_last_admission["ADMITTIME"].apply(
         lambda d: datetime.datetime.strptime(d, "%Y-%m-%d %H:%M:%S").date()
     )
-    df_admissions["DOB"] = df_admissions["DOB"].apply(
+    df_last_admission["DOB"] = df_last_admission["DOB"].apply(
         lambda d: datetime.datetime.strptime(d, "%Y-%m-%d %H:%M:%S").date()
     )
-    df_admissions["AGE"] = (df_admissions["ADMITDATE"] - df_admissions["DOB"]).apply(
+    df_last_admission["AGE"] = (df_last_admission["ADMITDATE"] - df_last_admission["DOB"]).apply(
         lambda t: t.days
     ) / 365.25
+    df_patients['AGE'] = df_last_admission[['SUBJECT_ID', 'AGE']].set_index('SUBJECT_ID')
+    return df_patients
 
 
-def filter_adult_patients(df_admission):
-    return df_admission[df_admission["AGE"] > 16]["SUBJECT_ID"]
+def filter_adult_patients(df_patients):
+    return df_patients[df_patients["AGE"] > 16]
 
 
 def merge_insurance(insurance_type):
@@ -83,7 +83,7 @@ def create_patient_insurance(df_patients, df_last_admission):
         "SUBJECT_ID"
     )
     df_patients["INSURANCE_3"] = df_patients["INSURANCE"].apply(merge_insurance)
-    return df_last_admission
+    return df_patients
 
 
 def create_patient_ethnicity(df_patients, df_admissions):
@@ -143,17 +143,17 @@ def merge_admission_type(df, key):
 
 
 def create_patient_admission_type(df_patients, df_last_admission, df_admissions):
-    df_patients["LAST_ADMISSION_TYPE"] = df_last_admission_patients[
+    df_patients["LAST_ADMISSION_TYPE"] = df_last_admission[
         ["SUBJECT_ID", "ADMISSION_TYPE"]
     ].set_index("SUBJECT_ID")
     df_patients["EVER_EMERGENCY"] = df_admissions.groupby("SUBJECT_ID").apply(
-        lambda df: merge(df, "EMERGENCY")
+        lambda df: merge_admission_type(df, "EMERGENCY")
     )
     df_patients["EVER_URGENT"] = df_admissions.groupby("SUBJECT_ID").apply(
-        lambda df: merge(df, "URGENT")
+        lambda df: merge_admission_type(df, "URGENT")
     )
     df_patients["EVER_ELECTIVE"] = df_admissions.groupby("SUBJECT_ID").apply(
-        lambda df: merge(df, "ELECTIVE")
+        lambda df: merge_admission_type(df, "ELECTIVE")
     )
     return df_patients
 
@@ -176,17 +176,17 @@ def main():
         "PATIENTS.csv", ["SUBJECT_ID", "GENDER", "DOB"]
     ).set_index("SUBJECT_ID")
     admissions = read_specific_col_table("ADMISSIONS.csv")
-    admissions = create_age_admission(admissions, patients)
     stays = read_specific_col_table("ICUSTAYS.csv", ["SUBJECT_ID", "HADM_ID", "LOS"])
     last_admission = (
         admissions.sort_values("ADMITTIME", ascending=False)
         .groupby("SUBJECT_ID")
         .head(1)
     )
+    patients = create_patient_age(patients, last_admission)
     patients = create_patient_insurance(patients, last_admission)
     patients = create_patient_ethnicity(patients, admissions)
     patients = create_patient_language(patients, admissions)
+    patients = create_patient_admission_type(patients, last_admission, admissions)
     patients = create_patient_los(patients, last_admission, admissions, stays)
-    subject_ids_adult = filter_adult_patients(last_admission)
-    patients_adult = patients[subject_ids_adult]
+    patients_adult = filter_adult_patients(patients)
     patients_adult.to_csv(os.path.join(OUTPUT_PATH, 'socioinfo_patients.csv'))
