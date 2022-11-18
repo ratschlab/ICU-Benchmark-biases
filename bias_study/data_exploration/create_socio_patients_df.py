@@ -23,13 +23,6 @@ def map_ethnicity(ethnicity):
         return "LATINO"
     if "ASIAN" in ethnicity:
         return "ASIAN"
-    if "MIDDLE EASTERN" in ethnicity:
-        return "MIDDLE EASTERN"
-    if (
-        ethnicity == "AMERICAN INDIAN/ALASKA NATIVE"
-        or ethnicity == "AMERICAN INDIAN/ALASKA NATIVE FEDERALLY RECOGNIZED TRIBE"
-    ):
-        return "NATIVE AMERICAN"
     if ethnicity in UNSPECIFIED_ETHN:
         return "UNK"
     else:
@@ -171,6 +164,12 @@ def create_patient_los(df_patients, df_last_admission, df_admissions, df_stays):
     return df_patients
 
 
+def create_patient_death(df_patients, df_admissions):
+    dead_patients = df_admissions[df_admissions['DISCHARGE_LOCATION']=='DEAD/EXPIRED']['SUBJECT_ID']
+    df_patients['DEATH_STAY'] = df_patients.index.isin(dead_patients)
+    return df_patients
+
+
 def main():
     patients = read_specific_col_table(
         "PATIENTS.csv", ["SUBJECT_ID", "GENDER", "DOB"]
@@ -188,5 +187,6 @@ def main():
     patients = create_patient_language(patients, admissions)
     patients = create_patient_admission_type(patients, last_admission, admissions)
     patients = create_patient_los(patients, last_admission, admissions, stays)
+    patients = create_patient_death(patients, admissions)
     patients_adult = filter_adult_patients(patients)
     patients_adult.to_csv(os.path.join(OUTPUT_PATH, 'socioinfo_patients.csv'))
