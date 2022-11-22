@@ -42,19 +42,13 @@ def merge_ethn(list_ethn):
     return first_ethn
 
 
-def read_specific_col_table(table_name, cols=None):
-    return pd.read_csv(os.path.join(COMMON_PATH, table_name), usecols=cols)
+def read_specific_col_table(table_name, cols=None, date_cols=False):
+    return pd.read_csv(os.path.join(COMMON_PATH, table_name), usecols=cols, parse_dates=date_cols)
 
 
 def create_patient_age(df_patients, df_last_admission):
     df_last_admission = pd.merge(df_last_admission, df_patients["DOB"], on="SUBJECT_ID")
-    df_last_admission["ADMITDATE"] = df_last_admission["ADMITTIME"].apply(
-        lambda d: datetime.datetime.strptime(d, "%Y-%m-%d %H:%M:%S").date()
-    )
-    df_last_admission["DOB"] = df_last_admission["DOB"].apply(
-        lambda d: datetime.datetime.strptime(d, "%Y-%m-%d %H:%M:%S").date()
-    )
-    df_last_admission["AGE"] = (df_last_admission["ADMITDATE"] - df_last_admission["DOB"]).apply(
+    df_last_admission["AGE"] = (df_last_admission["ADMITTIME"].dt.date - df_last_admission["DOB"].dt.date).apply(
         lambda t: t.days
     ) / 365.25
     df_patients['AGE'] = df_last_admission[['SUBJECT_ID', 'AGE']].set_index('SUBJECT_ID')
@@ -151,31 +145,41 @@ def create_patient_admission_type(df_patients, df_last_admission, df_admissions)
     return df_patients
 
 
-def create_patient_los(df_patients, df_last_admission, df_admissions, df_stays):
+def create_patient_icu_los(df_patients, df_last_admission, df_admissions, df_stays):
     hadm_los = pd.DataFrame(df_stays.groupby("HADM_ID")["LOS"].sum())
     hadm_los["SUBJECT_ID"] = df_admissions[["SUBJECT_ID", "HADM_ID"]].set_index(
         "HADM_ID"
     )
-    df_patients["LAST_LOS"] = hadm_los[
+    df_patients["LAST_ICU_LOS"] = hadm_los[
         hadm_los.index.isin(df_last_admission["HADM_ID"])
     ].set_index("SUBJECT_ID")["LOS"]
-    df_patients["MEAN_LOS"] = hadm_los.groupby("SUBJECT_ID").mean()
-    df_patients["NB_ADMISSIONS"] = df_admissions.groupby("SUBJECT_ID").size()
+    df_patients["MEAN_ICU_LOS"] = hadm_los.groupby("SUBJECT_ID").mean()
     return df_patients
 
+def create_patient_los(df_patients, df_last_admission, df_admissions):
+    df_patients["LAST_HOSPITAL_LOS"] = df_last_admission[['SUBJECT_ID', 'HOSPITAL_LOS']].set_index('SUBJECT_ID')
+    df_patients["MEAN_HOSPITAL_LOS"] = df_admission.groupby("SUBJECT_ID")['HOSPITAL_LOS'].mean()
+    return df_patients
+
+def create_length_admission(df_admissions):
+    df_admissions['HOSPITAL_LOS'] = (df_admissions['DISCHTIME'] -df_admissions['ADMITTIME']).dt.days
+    return df_admissions
 
 def create_patient_death(df_patients, df_admissions):
     dead_patients = df_admissions[df_admissions['DISCHARGE_LOCATION']=='DEAD/EXPIRED']['SUBJECT_ID']
-    df_patients['DEATH_STAY'] = df_patients.index.isin(dead_patients)
+    death_during_stay = df_admissions[df_admissions['DISCHTIME']>=df_admissions['DEATHTIME']]['SUBJECT_ID']
+    df_patients['DEATH_CLOSE_STAY'] = df_patients.index.isin(dead_patients)
+    df_patients['DEATH_DURING_STAY'] = df_patients.index.isin(death_during_stay)
     return df_patients
 
 
 def main():
     patients = read_specific_col_table(
-        "PATIENTS.csv", ["SUBJECT_ID", "GENDER", "DOB"]
+        "PATIENTS.csv", ["SUBJECT_ID", "GENDER", "DOB"], ["DOB"]
     ).set_index("SUBJECT_ID")
-    admissions = read_specific_col_table("ADMISSIONS.csv")
+    admissions = read_specific_col_table("ADMISSIONS.csv", date_cols=['ADMITTIME', 'DISCHTIME', 'DEATHTIME'])
     stays = read_specific_col_table("ICUSTAYS.csv", ["SUBJECT_ID", "HADM_ID", "LOS"])
+    admissions = create_length_admission(admissions)
     last_admission = (
         admissions.sort_values("ADMITTIME", ascending=False)
         .groupby("SUBJECT_ID")
@@ -186,7 +190,8 @@ def main():
     patients = create_patient_ethnicity(patients, admissions)
     patients = create_patient_language(patients, admissions)
     patients = create_patient_admission_type(patients, last_admission, admissions)
-    patients = create_patient_los(patients, last_admission, admissions, stays)
+    patients = create_patient_los(patients, last_admission, admissions)
+    patients = create_patient_icu_los(patients, last_admission, admissions, stays)
     patients = create_patient_death(patients, admissions)
     patients_adult = filter_adult_patients(patients)
     patients_adult.to_csv(os.path.join(OUTPUT_PATH, 'socioinfo_patients.csv'))
