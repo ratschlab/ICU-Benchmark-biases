@@ -4,7 +4,9 @@ import os
 import pandas as pd
 
 COMMON_PATH = "/cluster/work/grlab/clinical/mimic/MIMIC-III/cdb_1.4/source_data"
-OUTPUT_PATH = "/cluster/work/grlab/projects/projects2022-icu-biases/preprocessed_data/MIMIC"
+OUTPUT_PATH = (
+    "/cluster/work/grlab/projects/projects2022-icu-biases/preprocessed_data/MIMIC"
+)
 
 PUBLIC_INSURANCE = ["Medicare", "Medicaid", "Government"]
 UNSPECIFIED_ETHN = [
@@ -43,15 +45,19 @@ def merge_ethn(list_ethn):
 
 
 def read_specific_col_table(table_name, cols=None, date_cols=False):
-    return pd.read_csv(os.path.join(COMMON_PATH, table_name), usecols=cols, parse_dates=date_cols)
+    return pd.read_csv(
+        os.path.join(COMMON_PATH, table_name), usecols=cols, parse_dates=date_cols
+    )
 
 
 def create_patient_age(df_patients, df_last_admission):
     df_last_admission = pd.merge(df_last_admission, df_patients["DOB"], on="SUBJECT_ID")
-    df_last_admission["AGE"] = (df_last_admission["ADMITTIME"].dt.date - df_last_admission["DOB"].dt.date).apply(
-        lambda t: t.days
-    ) / 365.25
-    df_patients['AGE'] = df_last_admission[['SUBJECT_ID', 'AGE']].set_index('SUBJECT_ID')
+    df_last_admission["AGE"] = (
+        df_last_admission["ADMITTIME"].dt.date - df_last_admission["DOB"].dt.date
+    ).apply(lambda t: t.days) / 365.25
+    df_patients["AGE"] = df_last_admission[["SUBJECT_ID", "AGE"]].set_index(
+        "SUBJECT_ID"
+    )
     return df_patients
 
 
@@ -156,20 +162,36 @@ def create_patient_icu_los(df_patients, df_last_admission, df_admissions, df_sta
     df_patients["MEAN_ICU_LOS"] = hadm_los.groupby("SUBJECT_ID").mean()
     return df_patients
 
+
 def create_patient_los(df_patients, df_last_admission, df_admissions):
-    df_patients["LAST_HOSPITAL_LOS"] = df_last_admission[['SUBJECT_ID', 'HOSPITAL_LOS']].set_index('SUBJECT_ID')
-    df_patients["MEAN_HOSPITAL_LOS"] = df_admission.groupby("SUBJECT_ID")['HOSPITAL_LOS'].mean()
+    df_patients["LAST_HOSPITAL_LOS"] = df_last_admission[
+        ["SUBJECT_ID", "HOSPITAL_LOS"]
+    ].set_index("SUBJECT_ID")
+    df_patients["MEAN_HOSPITAL_LOS"] = (
+        df_admission.groupby("SUBJECT_ID")["HOSPITAL_LOS"]
+        .mean()
+        .apply(lambda t: pd.Timedelta(t).days)
+    )
+    df_patients["NB_ADMISSIONS"] = df_admissions.groupby("SUBJECT_ID").size()
     return df_patients
 
+
 def create_length_admission(df_admissions):
-    df_admissions['HOSPITAL_LOS'] = (df_admissions['DISCHTIME'] -df_admissions['ADMITTIME']).dt.days
+    df_admissions["HOSPITAL_LOS"] = (
+        df_admissions["DISCHTIME"] - df_admissions["ADMITTIME"]
+    ).dt.days
     return df_admissions
 
+
 def create_patient_death(df_patients, df_admissions):
-    dead_patients = df_admissions[df_admissions['DISCHARGE_LOCATION']=='DEAD/EXPIRED']['SUBJECT_ID']
-    death_during_stay = df_admissions[df_admissions['DISCHTIME']>=df_admissions['DEATHTIME']]['SUBJECT_ID']
-    df_patients['DEATH_CLOSE_STAY'] = df_patients.index.isin(dead_patients)
-    df_patients['DEATH_DURING_STAY'] = df_patients.index.isin(death_during_stay)
+    dead_patients = df_admissions[
+        df_admissions["DISCHARGE_LOCATION"] == "DEAD/EXPIRED"
+    ]["SUBJECT_ID"]
+    death_during_stay = df_admissions[
+        df_admissions["DISCHTIME"] >= df_admissions["DEATHTIME"]
+    ]["SUBJECT_ID"]
+    df_patients["DEATH_CLOSE_STAY"] = df_patients.index.isin(dead_patients)
+    df_patients["DEATH_DURING_STAY"] = df_patients.index.isin(death_during_stay)
     return df_patients
 
 
@@ -177,7 +199,9 @@ def main():
     patients = read_specific_col_table(
         "PATIENTS.csv", ["SUBJECT_ID", "GENDER", "DOB"], ["DOB"]
     ).set_index("SUBJECT_ID")
-    admissions = read_specific_col_table("ADMISSIONS.csv", date_cols=['ADMITTIME', 'DISCHTIME', 'DEATHTIME'])
+    admissions = read_specific_col_table(
+        "ADMISSIONS.csv", date_cols=["ADMITTIME", "DISCHTIME", "DEATHTIME"]
+    )
     stays = read_specific_col_table("ICUSTAYS.csv", ["SUBJECT_ID", "HADM_ID", "LOS"])
     admissions = create_length_admission(admissions)
     last_admission = (
@@ -194,4 +218,4 @@ def main():
     patients = create_patient_icu_los(patients, last_admission, admissions, stays)
     patients = create_patient_death(patients, admissions)
     patients_adult = filter_adult_patients(patients)
-    patients_adult.to_csv(os.path.join(OUTPUT_PATH, 'socioinfo_patients.csv'))
+    patients_adult.to_csv(os.path.join(OUTPUT_PATH, "socioinfo_patients.csv"))
