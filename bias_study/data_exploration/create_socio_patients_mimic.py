@@ -218,5 +218,7 @@ def main():
     patients = create_patient_icu_los(patients, last_admission, admissions, stays)
     patients = create_patient_death(patients, admissions)
     patients_adult = filter_adult_patients(patients)
-    patients_adult['LAST_HADM_ID'] = last_admission[['SUBJECT_ID', 'HADM_ID']].set_index('SUBJECT_ID')
+    patients_adult["LAST_HADM_ID"] = last_admission[
+        ["SUBJECT_ID", "HADM_ID"]
+    ].set_index("SUBJECT_ID")
     patients_adult.to_csv(os.path.join(OUTPUT_PATH, "socioinfo_patients.csv"))
