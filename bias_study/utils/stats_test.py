@@ -56,7 +56,7 @@ def run_k_sample_kruskal(df, var, hue, cats=None):
         cats (list, optional): list to precise the categories of hue to look at. Defaults to None."""
     if not cats:
         cats = df[df[hue].notna()][hue].unique()
-    samples = [df[df[hue] == cat][variable].dropna() for cat in cats]
+    samples = [df[df[hue] == cat][var].dropna() for cat in cats]
     return scipy.stats.kruskal(*samples, nan_policy="omit")
 
 
