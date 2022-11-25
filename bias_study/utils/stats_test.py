@@ -88,7 +88,7 @@ def run_chi_square_independence_test(df, var1, var2, filter1=None, filter2=None)
         df = df[df[var1].isin(filter1)]
     if filter2:
         df = df[df[var2].isin(filter2)]
-    table = pd.crosstab(patients[var1], patients[var2])
+    table = pd.crosstab(df[var1], df[var2])
     return scipy.stats.contingency.chi2_contingency(table)
 
 
