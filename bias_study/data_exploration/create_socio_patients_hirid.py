@@ -1,3 +1,4 @@
+import datetime
 import os
 
 import pandas as pd
@@ -5,12 +6,17 @@ import pandas as pd
 COMMON_PATH = (
     "/cluster/work/grlab/clinical/hirid_public/benchmark/pipeline_runs/run_tls/"
 )
+OUTPUT_PATH = (
+    "/cluster/work/grlab/projects/projects2022-icu-biases/preprocessed_data/HiRID"
+)
 PATIENT_PATH = os.path.join(COMMON_PATH, "general_table_extended.parquet")
 MERGED_PATH = os.path.join(COMMON_PATH, "merged_stage")
 
 
 def extract_length_stay(info_patients):
-    info_patients["lengthstay"] = info_patients["endtime"] - info_patients["starttime"]
+    info_patients["lengthstay"] = (
+        info_patients["endtime"] - info_patients["starttime"]
+    ) / datetime.timedelta(days=1)
     return info_patients
 
 
@@ -59,4 +65,6 @@ def main():
             )
     if not info_patients.index.is_unique:
         info_patients = filter_multiple_index(info_patients)
-    return patients.join(info_patients)
+    info_patients = extract_length_stay(info_patients)
+    patients = patients.join(info_patients)
+    patients.to_csv(os.path.join(OUTPUT_PATH, "socioinfo_patients.csv"))
