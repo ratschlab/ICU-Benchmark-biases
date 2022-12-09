@@ -267,7 +267,7 @@ class DLWrapper(object):
                 targets.append(target)
     
         with open(os.path.join(self.logdir, 'predictions.pkl'), 'wb') as f:
-            pickle.dump({'predictions': predictions, 'targets': targets}}, f)
+            pickle.dump({'predictions': predictions, 'targets': targets}, f)
 
     def save_weights(self, epoch, save_path):
         save_model(self.encoder, self.optimizer, epoch, save_path)
