@@ -387,7 +387,7 @@ class MLWrapper(object):
         with open(os.path.join(self.logdir, 'test_metrics.pkl'), 'wb') as f:
             pickle.dump(test_metric_results, f)
 
-    def get_predictions(self, dataset, weight):
+    def get_predictions(self, dataset, weight, split_name='test'):
         test_rep, test_label = dataset.get_data_and_labels()
         self.set_metrics(test_label)
         if "MAE" in self.metrics.keys() or isinstance(self.model,
@@ -397,7 +397,7 @@ class MLWrapper(object):
             test_pred = self.model.predict(test_rep)
         else:
             test_pred = self.model.predict_proba(test_rep)
-        with open(os.path.join(self.logdir, 'predictions.pkl'), 'wb') as f:
+        with open(os.path.join(self.logdir, f'{split_name}_predictions.pkl'), 'wb') as f:
             pickle.dump({'predictions': test_pred, 'targets': test_label}, f)
 
     def save_weights(self, save_path, model_type='lgbm'):
