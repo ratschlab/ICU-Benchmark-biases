@@ -392,8 +392,6 @@ class MLWrapper(object):
         self.set_metrics(test_label)
         if "MAE" in self.metrics.keys() or isinstance(self.model,
                                                       lightgbm.basic.Booster):  # If we reload a LGBM classifier
-            print(len(test_rep), len(test_rep[0]), len(test_label), test_label[0])
-            print(test_rep)
             test_pred = self.model.predict(test_rep)
         else:
             test_pred = self.model.predict_proba(test_rep)
