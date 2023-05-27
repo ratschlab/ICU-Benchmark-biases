@@ -402,7 +402,7 @@ def main(my_args=tuple(sys.argv[1:])):
                     if not load_weights:
                         log_dir_seed = os.path.join(log_dir_task, str(seed))
                     else:
-                        log_dir_seed = log_dir_task
+                        log_dir_seed = log_dir
                     train_with_gin(model_dir=log_dir_seed,
                                    overwrite=args.overwrite,
                                    load_weights=load_weights,
