@@ -252,6 +252,23 @@ class DLWrapper(object):
         eval_loss = float(sum(eval_loss) / (v + 1))
         return eval_loss, eval_metric_results
 
+    def get_predictions(self, dataset, weight):
+        test_loader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=self.n_worker,
+                                 pin_memory=self.pin_memory)
+        if isinstance(weight, list):
+            weight = torch.FloatTensor(weight).to(self.device)
+        self.encoder.eval()
+        predictions = []
+        targets = []
+        with torch.no_grad():
+            for v, elem in enumerate(test_loader):
+                loss, preds, target = self.step_fn(elem, weight)
+                predictions.append(preds)
+                targets.append(target)
+    
+        with open(os.path.join(self.logdir, 'predictions.pkl'), 'wb') as f:
+            pickle.dump({'predictions': predictions, 'targets': targets}, f)
+
     def save_weights(self, epoch, save_path):
         save_model(self.encoder, self.optimizer, epoch, save_path)
 
@@ -369,6 +386,17 @@ class MLWrapper(object):
         logging.info(test_string.format(*test_values))
         with open(os.path.join(self.logdir, 'test_metrics.pkl'), 'wb') as f:
             pickle.dump(test_metric_results, f)
+
+    def get_predictions(self, dataset, weight, split_name='test'):
+        test_rep, test_label = dataset.get_data_and_labels()
+        self.set_metrics(test_label)
+        if "MAE" in self.metrics.keys() or isinstance(self.model,
+                                                      lightgbm.basic.Booster):  # If we reload a LGBM classifier
+            test_pred = self.model.predict(test_rep)
+        else:
+            test_pred = self.model.predict_proba(test_rep)
+        with open(os.path.join(self.logdir, f'{split_name}_predictions.pkl'), 'wb') as f:
+            pickle.dump({'predictions': test_pred, 'targets': test_label}, f)
 
     def save_weights(self, save_path, model_type='lgbm'):
         if model_type == 'lgbm':

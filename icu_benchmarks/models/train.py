@@ -94,12 +94,16 @@ def train_common(log_dir, overwrite=False, load_weights=False, model=gin.REQUIRE
             sys.exit(1)
 
     del dataset.h5_loader.lookup_table
-    del val_dataset.h5_loader.lookup_table
 
     if do_test:
         test_dataset = dataset_fn(data_path, split='test')
         test_dataset.set_scaler(dataset.scaler)
         weight = dataset.get_balance()
-        model.test(test_dataset, weight)
+        #model.test(test_dataset, weight)
+        #model.get_predictions(dataset, weight, 'train')
+        model.get_predictions(val_dataset, weight, 'val')
+        model.get_predictions(test_dataset, weight, 'test')
+        #del dataset.h5_loader.lookup_table
+        del val_dataset.h5_loader.lookup_table
         del test_dataset.h5_loader.lookup_table
     save_config_file(log_dir)

@@ -23,7 +23,8 @@ SUBSAMPLE_FEAT = 0.66
 train_common.model = @MLWrapper()
 
 train_common.dataset_fn = @ICUVariableLengthDataset
-train_common.data_path = "/cluster/work/grlab/clinical/hirid_public/benchmark/pipeline_runs/run_tls/ml_stage/imputation_ffill_scaler_standard_clip_0.0_ml_stage_2_4_6_8_10_12_14_16_18_20_22h.h5"
+train_common.data_path = "/cluster/work/grlab/projects/projects2022-icu-biases/preprocessed_data/HiRID/imputation_ffill_scaler_standard_clip_0.0_ml_stage_2_4_6_8_10_12_14_16_18_20_22h_with_apache.h5"
+
 train_common.weight = %LOSS_WEIGHT
 train_common.do_test = True
 

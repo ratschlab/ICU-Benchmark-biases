@@ -2,14 +2,14 @@
 
 #SBATCH --cpus-per-task=8
 #SBATCH --nodes=1
-#SBATCH --time=5:00:00
+#SBATCH --time=2:00:00
 #SBATCH --mem-per-cpu=16G
-#SBATCH --job-name=predict_val
+#SBATCH --job-name=predict
 
 source activate icu-benchmark
 python -m icu_benchmarks.run train \
-                             -c configs/hirid/Classification/LGBM.gin \
-                             -l logs/benchmark_exp/LGBM/with_val/ \
+                             -c configs/hirid/Classification/LGBM_w_APACHE.gin \
+                             -l logs/benchmark_exp/LGBM_w_APACHE/ \
                              -t Dynamic_CircFailure_12Hours\
                              -o True \
                              --depth 4 \
